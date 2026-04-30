@@ -1,0 +1,106 @@
+from flask import Flask, render_template_string, session, redirect, request import sqlite3
+
+app = Flask(name) app.secret_key = "CHANGE_SECRET"
+
+DB = "bot.db"
+
+---------------- ADMIN CREDENTIALS ----------------
+
+ADMIN_EMAIL = "lailatulislam753@gmail.com" ADMIN_PASS = "Raj123@"
+
+---------------- DB ----------------
+
+def db(): conn = sqlite3.connect(DB) conn.row_factory = sqlite3.Row return conn
+
+---------------- ADMIN CHECK ----------------
+
+def admin(): return session.get("admin")
+
+---------------- ADMIN LOGIN ----------------
+
+@app.route("/", methods=["GET","POST"]) def login(): if request.method == "POST": if request.form["email"] == ADMIN_EMAIL and request.form["password"] == ADMIN_PASS: session["admin"] = True return redirect("/admin") return """ <h2>Admin Login</h2> <form method='POST'> Email: <input name='email'><br> Password: <input name='password' type='password'><br> <button>Login</button> </form> """
+
+---------------- ADMIN DASHBOARD ----------------
+
+@app.route("/admin") def dashboard(): if not admin(): return "Access Denied"
+
+conn = db()
+cur = conn.cursor()
+
+cur.execute("SELECT COUNT(*) FROM users")
+users = cur.fetchone()[0]
+
+cur.execute("SELECT COUNT(*) FROM users WHERE email_verified=1")
+verified = cur.fetchone()[0]
+
+cur.execute("SELECT SUM(balance) FROM users")
+revenue = cur.fetchone()[0] or 0
+
+return f"""
+<h1>🔥 ADMIN DASHBOARD</h1>
+
+<div>
+👥 Users: {users}<br>
+✅ Verified: {verified}<br>
+💰 Revenue: {revenue}<br>
+</div>
+
+<hr>
+
+<a href='/users'>Users</a> |
+<a href='/orders'>Orders</a> |
+<a href='/logout'>Logout</a>
+"""
+
+---------------- USERS ----------------
+
+@app.route("/users") def users(): if not admin(): return "Denied"
+
+conn = db()
+cur = conn.cursor()
+cur.execute("SELECT * FROM users")
+rows = cur.fetchall()
+
+html = "<h2>👥 USERS</h2>"
+
+for u in rows:
+    html += f"""
+    <div style='border:1px solid #444;padding:10px;margin:5px'>
+    📧 {u['email']}<br>
+    💰 Balance: {u['balance']}<br>
+    🔐 Verified: {u['email_verified']}<br>
+    </div>
+    """
+
+return html
+
+---------------- ORDERS ----------------
+
+@app.route("/orders") def orders(): if not admin(): return "Denied"
+
+conn = db()
+cur = conn.cursor()
+
+cur.execute("SELECT * FROM orders ORDER BY id DESC")
+rows = cur.fetchall()
+
+html = "<h2>📦 ORDERS</h2>"
+
+for o in rows:
+    html += f"""
+    <div style='border:1px solid #555;padding:10px;margin:5px'>
+    👤 User: {o['user_id']}<br>
+    📝 {o['text']}<br>
+    📌 Status: {o['status']}<br>
+    </div>
+    """
+
+return html
+
+---------------- LOGOUT ----------------
+
+@app.route("/logout") def logout(): session.clear() return redirect("/")
+
+---------------- RUN ----------------
+
+if name == "main": app.run(debug=True)
